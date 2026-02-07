@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI HD Foto – Made in Relz & Mira</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.16.0/dist/tf.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0; min-height:100vh;
+  background: radial-gradient(circle at top, #0a1a1f, #000 70%);
+  font-family:'Orbitron',sans-serif; color:#bffcff;
+  display:flex; justify-content:center; align-items:center;
+}
+.app{
+  width:95%; max-width:1000px;
+  background:rgba(6,14,18,.9);
+  border:1px solid #2fd3ff;
+  border-radius:18px;
+  padding:14px;
+  box-shadow:0 0 18px rgba(47,211,255,.35);
+}
+header{text-align:center; margin-bottom:6px}
+.credit{font-size:12px; opacity:.7}
+
+.controls{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+  gap:8px; margin:10px 0;
+}
+.btn,select{
+  background:#07141a;
+  border:1px solid #2fd3ff;
+  color:#bffcff;
+  padding:8px 10px;
+  border-radius:10px;
+  cursor:pointer;
+}
+.btn:hover,select:hover{background:#0b2430}
+input[type=file]{display:none}
+
+.preview{
+  display:grid; grid-template-columns:1fr 1fr; gap:8px;
+}
+.preview img, .preview canvas{
+  width:100%; border:1px solid #2fd3ff; border-radius:12px; background:#000;
+}
+.status{font-size:12px; opacity:.8}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>🔰AI HD FOTO🔰</h1>
+    <div class="credit">Made in Relz & Mira</div>
+  </header>
+
+  <div class="controls">
+    <label class="btn">
+      📸 Upload
+      <input type="file" id="fileInput" accept="image/*">
+    </label>
+
+    <select id="resSelect">
+      <option value="720">720p</option>
+      <option value="1080" selected>1080p</option>
+      <option value="1440">2K (1440p)</option>
+      <option value="2160">4K (2160p)</option>
+    </select>
+
+    <button class="btn" onclick="runAI()">🤖 AI Enhance</button>
+    <button class="btn" onclick="downloadHD()">⬇ Download</button>
+  </div>
+
+  <div class="preview">
+    <img id="beforeImg" />
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="status" id="status">Status: siap.</div>
+</div>
+
+<script>
+const fileInput = document.getElementById("fileInput");
+const beforeImg = document.getElementById("beforeImg");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const resSelect = document.getElementById("resSelect");
+const statusEl = document.getElementById("status");
+
+let img = new Image();
+
+fileInput.addEventListener("change", e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{ beforeImg.src = r.result; img.src = r.result; };
+  r.readAsDataURL(f);
+});
+
+async function runAI(){
+  if(!img.src) return alert("Upload foto dulu!");
+  statusEl.textContent = "Status: loading AI engine (pertama kali agak lama)...";
+
+  await tf.ready();
+  statusEl.textContent = "Status: memproses AI...";
+
+  const targetH = parseInt(resSelect.value,10);
+  const scale = targetH / img.height;
+  const w = Math.round(img.width * scale);
+  const h = targetH;
+
+  canvas.width = w;
+  canvas.height = h;
+
+  // AI-lite pipeline: upscale + sharpen + contrast via tfjs
+  const input = tf.browser.fromPixels(img).toFloat().div(255);
+  const up = tf.image.resizeBilinear(input, [h, w], true);
+
+  const kernel = tf.tensor4d([
+     0,-1, 0,
+    -1, 5,-1,
+     0,-1, 0
+  ], [3,3,1,1]);
+
+  const r = up.slice([0,0,0],[h,w,1]).expandDims(0);
+  const g = up.slice([0,0,1],[h,w,1]).expandDims(0);
+  const b = up.slice([0,0,2],[h,w,1]).expandDims(0);
+
+  const rr = tf.conv2d(r, kernel, 1, "same");
+  const gg = tf.conv2d(g, kernel, 1, "same");
+  const bb = tf.conv2d(b, kernel, 1, "same");
+
+  const out = tf.concat([rr,gg,bb], 3).squeeze().clipByValue(0,1);
+  await tf.browser.toPixels(out, canvas);
+
+  tf.dispose([input, up, r, g, b, rr, gg, bb, out]);
+  statusEl.textContent = "Status: selesai ✔";
+}
+
+function downloadHD(){
+  if(!canvas.width) return alert("Belum ada hasil!");
+  canvas.toBlob(function(blob){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "AI-HD-Relz-Mira.png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, "image/png");
+}
+</script>
+</body>
+</html>
