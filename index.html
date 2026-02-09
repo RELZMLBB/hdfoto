@@ -10,14 +10,14 @@
 *{box-sizing:border-box;font-family:Poppins,sans-serif}
 body{
   margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-  color:#eafcff;background:#000;
+  color:#eafcff;background:#000;overflow:hidden;
 }
 .bg{
   position:fixed;inset:0;z-index:-2;
   background-size:cover;background-position:center;
   filter: brightness(.6);
 }
-.overlay{position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg, rgba(0,0,0,.65), rgba(0,0,0,.85));}
+.overlay{position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.85));}
 .app{
   width:95%;max-width:420px;padding:18px;border-radius:18px;
   background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.03));
@@ -81,10 +81,91 @@ button{cursor:pointer;font-weight:700;color:#001015;background:linear-gradient(1
 </div>
 
 <script>
-const WALLPAPER_URL = "https://i.imgur.com/sIIj3Na.jpeg"; // GANTI DENGAN LINK LANGSUNG IMGUR
+const WALLPAPER_URL = "https://i.imgur.com/sIIj3Na.jpeg"; // ganti pake direct link Imgur lu
 document.getElementById("bg").style.backgroundImage = `url('${WALLPAPER_URL}')`;
 
-/* --- JS proses HD (sama kayak sebelumnya) --- */
+const upload = document.getElementById('upload');
+const resSelect = document.getElementById('res');
+const enhanceSelect = document.getElementById('enhance');
+const preview = document.getElementById('preview');
+const actions = document.getElementById('actions');
+const processBtn = document.getElementById('process');
+const downloadBtn = document.getElementById('download');
+const resetBtn = document.getElementById('reset');
+const modal = document.getElementById('modal');
+const modalImg = document.getElementById('modalImg');
+const closeModal = document.getElementById('close');
+
+let originalImg = new Image();
+let resultDataURL = null;
+
+upload.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    originalImg = new Image();
+    originalImg.onload = () => {
+      preview.style.display = 'block';
+      preview.innerHTML = `<img src="${ev.target.result}">`;
+      actions.style.display = 'none';
+    };
+    originalImg.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+processBtn.onclick = () => {
+  if(!originalImg.src) return alert("Upload foto dulu bro!");
+  const targetH = parseInt(resSelect.value);
+  const ratio = originalImg.width / originalImg.height;
+  const newH = targetH;
+  const newW = Math.round(newH * ratio);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = newW; canvas.height = newH;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(originalImg, 0, 0, newW, newH);
+
+  if(enhanceSelect.value === "1"){
+    const imgData = ctx.getImageData(0,0,newW,newH);
+    const d = imgData.data;
+    for(let i=0;i<d.length;i+=4){
+      d[i] = Math.min(255, d[i]*1.05);
+      d[i+1] = Math.min(255, d[i+1]*1.05);
+      d[i+2] = Math.min(255, d[i+2]*1.05);
+    }
+    ctx.putImageData(imgData,0,0);
+  }
+
+  resultDataURL = canvas.toDataURL("image/jpeg", 0.95);
+  preview.innerHTML = `<img id="resultImg" src="${resultDataURL}" title="Klik buat lihat full">`;
+  actions.style.display = 'flex';
+
+  document.getElementById('resultImg').onclick = () => {
+    modal.style.display = 'flex';
+    modalImg.src = resultDataURL;
+  };
+};
+
+downloadBtn.onclick = () => {
+  const a = document.createElement('a');
+  a.href = resultDataURL;
+  a.download = "HD-Relra.jpg";
+  a.click();
+};
+
+resetBtn.onclick = () => {
+  upload.value = "";
+  preview.style.display = 'none';
+  preview.innerHTML = "";
+  actions.style.display = "none";
+  originalImg = new Image();
+  resultDataURL = null;
+};
+
+closeModal.onclick = () => modal.style.display = 'none';
+modal.onclick = (e) => { if(e.target === modal) modal.style.display = 'none'; };
 </script>
 </body>
 </html>
